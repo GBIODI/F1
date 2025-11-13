@@ -53,19 +53,40 @@
             opacity: 0.7;
             cursor: not-allowed;
         }
+        
+        /* --- NUEVO ESTILO PARA EL MODAL --- */
+        /* Fondo oscuro del modal */
+        #game-modal-overlay {
+            transition: opacity 0.3s ease;
+        }
+        /* Contenedor del modal */
+        #game-modal-content {
+            transition: all 0.3s ease;
+            transform: translateY(-20px);
+        }
+        #game-modal.hidden #game-modal-content {
+            transform: translateY(0px);
+        }
+        
     </style>
 </head>
 <body class="bg-gray-900 text-white min-h-screen p-4 sm:p-8">
 
     <header class="max-w-7xl mx-auto mb-6">
-        <div class="flex flex-col sm:flex-row justify-between items-center">
-            <h1 class="text-3xl sm:text-4xl font-bold text-center text-blue-300 mb-4 sm:mb-0">
+        <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
+            <h1 class="text-3xl sm:text-4xl font-bold text-center text-blue-300">
                 ¿A Quién Elijo? - F1 Edition
             </h1>
             
-            <!-- Botón de Reinicio --><button id="reset-button" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition-colors duration-300">
-                Reiniciar Juego
-            </button>
+            <div class="flex gap-2">
+                <!-- NUEVO BOTÓN DE ADIVINAR --><button id="guess-button" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-6 rounded-lg shadow-md transition-colors duration-300">
+                    Adivinar Piloto
+                </button>
+                
+                <!-- Botón de Reinicio --><button id="reset-button" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition-colors duration-300">
+                    Reiniciar Juego
+                </button>
+            </div>
         </div>
     </header>
 
@@ -87,7 +108,7 @@
                         <option value="">-- Elige un piloto --</option>
                         <!-- Las opciones se generarán aquí por JavaScript --></select>
                     
-                    <!-- NUEVO BOTÓN DE CONFIRMAR --><button id="lock-button" class="hidden w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-all duration-300">
+                    <!-- BOTÓN DE CONFIRMAR --><button id="lock-button" class="hidden w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-all duration-300">
                         Confirmar Piloto
                     </button>
                     
@@ -99,6 +120,26 @@
         </aside>
 
     </main>
+
+    <!-- --- NUEVO MODAL DE VICTORIA/DERROTA --- -->
+    <div id="game-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+        <!-- Fondo oscuro -->
+        <div id="game-modal-overlay" class="absolute inset-0 bg-black bg-opacity-75"></div>
+        
+        <!-- Contenido del modal -->
+        <div id="game-modal-content" class="relative bg-gray-800 rounded-lg shadow-xl w-full max-w-md p-6">
+            <!-- Texto del mensaje (se llenará con JS) -->
+            <p id="game-modal-text" class="text-white text-lg text-center mb-6">
+                Este es un mensaje de prueba.
+            </p>
+            
+            <!-- Botón de cerrar -->
+            <button id="game-modal-close" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">
+                Entendido
+            </button>
+        </div>
+    </div>
+
 
     <script>
         // Objeto con los personajes y sus URLs (APUNTANDO A LA CARPETA LOCAL 'imagenes/')
@@ -136,9 +177,16 @@
             const resetButton = document.getElementById('reset-button');
             const characterSelect = document.getElementById('character-select');
             const mysteryCardImage = document.getElementById('mystery-card-image');
-            
-            // --- NUEVO ELEMENTO ---
             const lockButton = document.getElementById('lock-button');
+            
+            // --- NUEVOS ELEMENTOS ---
+            const guessButton = document.getElementById('guess-button');
+            const gameModal = document.getElementById('game-modal');
+            const modalText = document.getElementById('game-modal-text');
+            const closeModalButton = document.getElementById('game-modal-close');
+            
+            // --- LÍNEA CORREGIDA ---
+            const gameModalOverlay = document.getElementById('game-modal-overlay'); // Se añade la definición
             
             // Placeholder 1:1
             const placeholderImage = "https://placehold.co/300x300/4B5563/9CA3AF?text=Selecciona+un+piloto"; 
@@ -152,6 +200,7 @@
                     const card = document.createElement('div');
                     card.className = 'character-card';
                     card.setAttribute('role', 'button');
+                    // IMPORTANTE: El 'aria-label' se usa para la lógica de victoria
                     card.setAttribute('aria-label', `Carta de ${character.name}`);
                     const cardInner = document.createElement('div');
                     cardInner.className = 'card-inner';
@@ -186,14 +235,15 @@
                     card.classList.remove('is-flipped');
                 });
 
-                // Reinicia el selector y la imagen
                 characterSelect.value = ""; 
                 mysteryCardImage.src = placeholderImage;
                 mysteryCardImage.alt = "Piloto misterioso";
                 
-                // --- NUEVAS LÍNEAS ---
                 characterSelect.disabled = false; // Habilita el dropdown
                 lockButton.classList.add('hidden'); // Oculta el botón de confirmar
+                
+                // --- NUEVA LÍNEA ---
+                gameModal.classList.add('hidden'); // Oculta el modal
             }
 
             // Función para llenar el menú desplegable (sin cambios)
@@ -207,15 +257,14 @@
                 });
             }
 
-            // --- FUNCIÓN HANDLECHARACTERSELECT (ACTUALIZADA) ---
+            // Función para manejar la selección de personaje (sin cambios)
             function handleCharacterSelect(event) {
                 const selectedName = event.target.value;
 
                 if (selectedName === "") {
                     mysteryCardImage.src = placeholderImage;
                     mysteryCardImage.alt = "Piloto misterioso";
-                    // --- NUEVA LÍNEA ---
-                    lockButton.classList.add('hidden'); // Oculta el botón si no hay selección
+                    lockButton.classList.add('hidden'); 
                     return;
                 }
 
@@ -224,39 +273,74 @@
                 if (selectedCharacter) {
                     mysteryCardImage.src = selectedCharacter.imageUrl;
                     mysteryCardImage.alt = `Piloto elegido: ${selectedCharacter.name}`;
-                    // --- NUEVA LÍNEA ---
-                    lockButton.classList.remove('hidden'); // Muestra el botón de confirmar
+                    lockButton.classList.remove('hidden'); 
                 }
             }
             
-            // --- NUEVA FUNCIÓN ---
-            // Se ejecuta al hacer clic en "Confirmar Piloto"
+            // Función para bloquear la elección (sin cambios)
             function lockChoice() {
-                characterSelect.disabled = true; // Deshabilita el dropdown
-                lockButton.classList.add('hidden'); // Oculta el botón
+                characterSelect.disabled = true; 
+                lockButton.classList.add('hidden'); 
+            }
+            
+            // --- NUEVA FUNCIÓN ---
+            // Muestra el modal con un texto específico
+            function showModal(text) {
+                modalText.innerHTML = text; // Usamos innerHTML para permitir saltos de línea con <br>
+                gameModal.classList.remove('hidden');
+            }
+            
+            // --- NUEVA FUNCIÓN ---
+            // Lógica para comprobar si se ha ganado
+            function checkWin() {
+                const secretName = characterSelect.value;
+                
+                // 1. Comprobar si se ha confirmado un piloto
+                if (characterSelect.disabled === false || secretName === "") {
+                    showModal("Debes elegir y confirmar tu piloto secreto antes de adivinar.");
+                    return;
+                }
+                
+                // 2. Comprobar cuántas cartas quedan boca arriba
+                const faceUpCards = document.querySelectorAll('.character-card:not(.is-flipped)');
+                
+                if (faceUpCards.length !== 1) {
+                    showModal("¡Aún no! Debes dejar exactamente UN piloto boca arriba para poder adivinar.");
+                    return;
+                }
+                
+                // 3. Hay exactamente 1 carta. Comprobar si es la correcta.
+                const guessName = faceUpCards[0].getAttribute('aria-label').replace('Carta de ', '');
+                
+                if (guessName === secretName) {
+                    showModal(`¡GANASTE! 🥳<br><br>Adivinaste correctamente. El piloto era <strong>${secretName}</strong>.`);
+                } else {
+                    showModal(`¡Oh no! Perdiste.<br><br>Dejaste a <strong>${guessName}</strong>, pero tu piloto secreto era <strong>${secretName}</strong>.`);
+                }
             }
 
             // Asignar eventos
             resetButton.addEventListener('click', resetGame);
             characterSelect.addEventListener('change', handleCharacterSelect);
-            
-            // --- NUEVO EVENTO ---
             lockButton.addEventListener('click', lockChoice);
+            
+            // --- NUEVOS EVENTOS ---
+            guessButton.addEventListener('click', checkWin);
+            closeModalButton.addEventListener('click', () => gameModal.classList.add('hidden'));
+            gameModalOverlay.addEventListener('click', () => gameModal.classList.add('hidden'));
+
 
             // Inicializar el juego
             createBoard();
             populateSelect(); 
         });
     </script>
-    <script type="module">
-  // Import the functions you need from the SDKs you need
+    <!-- 🔥 Firebase + Firestore -->
+<script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
-  import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-analytics.js";
-  // TODO: Add SDKs for Firebase products that you want to use
-  // https://firebase.google.com/docs/web/setup#available-libraries
+  import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
 
-  // Your web app's Firebase configuration
-  // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+  // Configuración de tu proyecto
   const firebaseConfig = {
     apiKey: "AIzaSyAvbzdUY9CokU9Rh-OJkZf7SF3Nxvu5QNk",
     authDomain: "f1-juego.firebaseapp.com",
@@ -267,10 +351,26 @@
     measurementId: "G-M4Q3GCHKY8"
   };
 
-  // Initialize Firebase
+  // Inicializa Firebase
   const app = initializeApp(firebaseConfig);
-  const analytics = getAnalytics(app);
-  </script>
+  const db = getFirestore(app);
+  console.log("✅ Firebase y Firestore inicializados correctamente.");
+
+  // 📤 Guarda una prueba al abrir la página
+  async function guardarPrueba() {
+    try {
+      await addDoc(collection(db, "partidas"), {
+        jugador: "Ruso",
+        puntos: 10,
+        fecha: new Date()
+      });
+      console.log("🎯 Datos guardados correctamente en Firestore.");
+    } catch (e) {
+      console.error("❌ Error al guardar:", e);
+    }
+  }
+
+  guardarPrueba();
+</script>
 </body>
 </html>
-
