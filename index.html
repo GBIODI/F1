@@ -3,8 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>¿A Quién Elijo? - F1 Edition</title>
+    <title>A Quién Elijo? - Edición F1 </title>
     
+    <!-- ÍCONO DE LA PÁGINA (Favicon) -->
+    <link rel="icon" type="image/png" href="imagenes/logo-f1.png">
+
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
@@ -299,7 +302,7 @@
 
     <!-- PANTALLA DE LOBBY -->
     <div id="lobby-screen" class="hidden max-w-md mx-auto mt-10 sm:mt-20 text-center fade-in px-4">
-        <h1 class="text-5xl font-black text-white italic mb-2 tracking-tighter">F1 <span class="text-red-600">GUESS</span></h1>
+        <h1 class="text-5xl font-black text-white italic mb-2 tracking-tighter">F1 <span class="text-red-600">GUESS WHO?</span></h1>
         <p class="text-slate-400 mb-8">Edición Pilotos 2025</p>
         
         <div class="bg-slate-800 p-6 rounded-2xl shadow-2xl border border-slate-700">
@@ -342,7 +345,7 @@
                 </div>
             </div>
             <button id="guess-button" class="w-full sm:w-auto bg-yellow-500 hover:bg-yellow-400 text-black font-extrabold py-3 px-8 rounded-lg shadow-[0_4px_0_rgb(161,98,7)] active:shadow-none active:translate-y-[4px] transition-all uppercase tracking-wide">
-                ✋ ¡Adivinar!
+                ¡Adivinar!
             </button>
         </header>
 
@@ -350,8 +353,8 @@
             
             <!-- Tablero -->
             <section class="w-full lg:w-3/4 order-2 lg:order-1">
-                <!-- GRID CORREGIDO: 2 columnas en móvil, 4 en tablet, 5 en PC -->
-                <div id="game-board" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4">
+                <!-- GRID CORREGIDO: 2 columnas en móvil, 3 en tablet, MÁXIMO 4 en PC -->
+                <div id="game-board" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4">
                     <!-- Cartas generadas por JS -->
                 </div>
             </section>
