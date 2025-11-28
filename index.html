@@ -3,10 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>A Quién Elijo? - Edición F1 </title>
+    <title>A Quién Elijo? - Edición F1</title>
     
-    <!-- ÍCONO DE LA PÁGINA (Favicon) -->
-    <!-- CORREGIDO: Ahora apunta a "f1 logo.png" -->
+    <!-- ÍCONO DE LA PESTAÑA (Favicon): Solo aquí usamos 'f1 logo.png' para el navegador -->
     <link rel="icon" type="image/png" href="imagenes/f1 logo.png">
 
     <!-- Tailwind CSS -->
@@ -22,7 +21,7 @@
         import { getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // ==========================================
-        // TU CONFIGURACIÓN DE FIREBASE (PEGA AQUÍ TUS DATOS)
+        // CONFIGURACIÓN DE FIREBASE
         // ==========================================
         const firebaseConfig = {
             apiKey: "AIzaSyC5J_1zcuh8HpM7vgnVT49ktcpAxQ-GFIY",
@@ -43,7 +42,7 @@
         let currentRoomId = null;
         let isHost = false;
         let roomData = null;
-        let localRestartTimestamp = 0; // Para controlar reinicios
+        let localRestartTimestamp = 0;
 
         // Autenticación
         signInAnonymously(auth).catch((error) => {
@@ -77,7 +76,7 @@
                 status: 'waiting',
                 hostSecret: null,
                 guestSecret: null,
-                restartId: 0, // Control para reiniciar partida
+                restartId: 0,
                 createdAt: Date.now()
             });
 
@@ -113,16 +112,15 @@
             }
         };
 
-        // Escuchar cambios (Aquí ocurre la magia del reinicio)
+        // Escuchar cambios
         function subscribeToRoom(roomId) {
             onSnapshot(getRoomRef(roomId), (doc) => {
                 if (!doc.exists()) return;
                 roomData = doc.data();
                 
-                // Detectar si alguien reinició la partida
                 if (roomData.restartId && roomData.restartId > localRestartTimestamp) {
                     localRestartTimestamp = roomData.restartId;
-                    resetLocalBoard(); // Limpia el tablero visualmente
+                    resetLocalBoard();
                 }
 
                 updateGameUI(roomData);
@@ -173,6 +171,7 @@
             if (faceUpCards.length !== 1) {
                 document.getElementById('modal-title').innerText = "¡Cuidado!";
                 document.getElementById('modal-message').innerHTML = "Debes descartar cartas hasta que quede <strong>SOLO UNA</strong>.";
+                document.getElementById('modal-image-container').classList.add('hidden');
                 document.getElementById('modal-restart-btn').classList.add('hidden');
                 document.getElementById('game-modal').classList.remove('hidden');
                 return;
@@ -182,18 +181,27 @@
             const modalTitle = document.getElementById('modal-title');
             const modalMsg = document.getElementById('modal-message');
             const restartBtn = document.getElementById('modal-restart-btn');
+            
+            // Imagen del piloto secreto
+            const secretPilot = window.charactersData.find(c => c.name === opponentSecret);
+            const secretImgUrl = secretPilot ? secretPilot.imageUrl : '';
+
+            // Mostrar imagen
+            const imgContainer = document.getElementById('modal-image-container');
+            const modalImg = document.getElementById('modal-pilot-image');
+            modalImg.src = secretImgUrl;
+            imgContainer.classList.remove('hidden');
 
             if (guessedName === opponentSecret) {
                 modalTitle.innerText = "¡VICTORIA! 🏆";
-                modalTitle.className = "text-3xl font-bold text-green-400 mb-2";
-                modalMsg.innerHTML = `¡Correcto! El piloto era <strong>${opponentSecret}</strong>.`;
+                modalTitle.className = "text-4xl font-black text-green-400 mb-2 italic";
+                modalMsg.innerHTML = `¡Correcto! Era <strong class="text-white">${opponentSecret}</strong>.`;
             } else {
                 modalTitle.innerText = "DERROTA ❌";
-                modalTitle.className = "text-3xl font-bold text-red-500 mb-2";
-                modalMsg.innerHTML = `Te quedaste con <strong>${guessedName}</strong>, pero era <strong>${opponentSecret}</strong>.`;
+                modalTitle.className = "text-4xl font-black text-red-500 mb-2 italic";
+                modalMsg.innerHTML = `Te quedaste con <strong>${guessedName}</strong>, pero era... <strong class="text-white">${opponentSecret}</strong>.`;
             }
 
-            // Mostrar botón de reiniciar
             restartBtn.classList.remove('hidden');
             document.getElementById('game-modal').classList.remove('hidden');
         };
@@ -201,51 +209,43 @@
         // Lógica de Reinicio
         window.triggerRestart = async () => {
             if (!currentRoomId) return;
-            
-            // Cerrar modal
             document.getElementById('game-modal').classList.add('hidden');
-
-            // Actualizar DB para avisar al otro jugador
             await updateDoc(getRoomRef(currentRoomId), {
                 hostSecret: null,
                 guestSecret: null,
-                restartId: Date.now() // Nuevo timestamp fuerza el reinicio en ambos
+                restartId: Date.now()
             });
         };
 
         // Resetear UI Local
         function resetLocalBoard() {
-            // Voltear todas las cartas
             document.querySelectorAll('.character-card').forEach(card => {
                 card.classList.remove('is-flipped');
             });
 
-            // Resetear panel de selección
             const select = document.getElementById('character-select');
+            const lockBtn = document.getElementById('lock-button');
+            const confirmedMsg = document.getElementById('confirmed-msg');
+            const mysteryImg = document.getElementById('mystery-card-image');
+
             select.disabled = false;
             select.value = "";
-            document.getElementById('lock-button').classList.remove('hidden');
-            document.getElementById('confirmed-msg').classList.add('hidden');
-            document.getElementById('mystery-card-image').src = "https://placehold.co/300x300/1f2937/9CA3AF?text=?";
-            
-            // Cerrar modal si estaba abierto
+            lockBtn.classList.add('hidden'); 
+            confirmedMsg.classList.add('hidden');
+            mysteryImg.src = "https://placehold.co/300x300/1f2937/9CA3AF?text=?";
             document.getElementById('game-modal').classList.add('hidden');
         }
-
     </script>
 
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #0f172a; }
-        
-        /* CORRECCIÓN DE CARTAS: Evita que se muevan o deformen */
         .character-card {
             background-color: transparent;
             perspective: 1000px;
             cursor: pointer;
-            aspect-ratio: 1 / 1; /* VOLVEMOS A CUADRADO (1:1) */
+            aspect-ratio: 1 / 1;
             position: relative;
         }
-
         .card-inner {
             position: relative;
             width: 100%;
@@ -254,15 +254,10 @@
             transition: transform 0.6s;
             transform-style: preserve-3d;
         }
-
-        .character-card.is-flipped .card-inner {
-            transform: rotateY(180deg);
-        }
-
-        /* IMPORTANTE: position absolute para que ocupen el mismo espacio */
+        .character-card.is-flipped .card-inner { transform: rotateY(180deg); }
         .card-front, .card-back {
             position: absolute;
-            inset: 0; /* top:0, right:0, bottom:0, left:0 */
+            inset: 0;
             width: 100%;
             height: 100%;
             -webkit-backface-visibility: hidden;
@@ -271,22 +266,15 @@
             overflow: hidden;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
         }
-
-        .card-front {
-            background-color: #1e293b;
-            border: 2px solid #334155;
-        }
-
+        .card-front { background-color: #1e293b; border: 2px solid #334155; }
         .card-back {
-            background-color: #7f1d1d; /* Rojo oscuro F1 */
-            border: 2px solid #ef4444;
+            background-color: #0f172a;
+            border: 2px solid #334155;
             transform: rotateY(180deg);
             display: flex;
             align-items: center;
             justify-content: center;
-            background-image: repeating-linear-gradient(45deg, #7f1d1d 0, #7f1d1d 10px, #991b1b 10px, #991b1b 20px);
         }
-
         .fade-in { animation: fadeIn 0.5s ease-in; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     </style>
@@ -301,22 +289,18 @@
         </div>
     </div>
 
-    <!-- PANTALLA DE LOBBY -->
+    <!-- PANTALLA DE LOBBY: Título original de texto recuperado -->
     <div id="lobby-screen" class="hidden max-w-md mx-auto mt-10 sm:mt-20 text-center fade-in px-4">
-        <h1 class="text-5xl font-black text-white italic mb-2 tracking-tighter">F1 <span class="text-red-600">GUESS WHO?</span></h1>
-        <p class="text-slate-400 mb-8">Edición Pilotos 2025</p>
+        <!-- Eliminé la imagen grande de aquí para volver al texto -->
+        <h1 class="text-6xl font-black text-white italic mb-2 tracking-tighter transform -skew-x-6">
+            F1 <span class="text-red-600">GUESS WHO?</span>
+        </h1>
+        <p class="text-slate-400 mb-8 font-medium">Edición Pilotos 2025</p>
         
-        <div class="bg-slate-800 p-6 rounded-2xl shadow-2xl border border-slate-700">
+        <div class="bg-slate-800 p-6 rounded-2xl shadow-2xl border border-slate-700 mt-8">
             <button onclick="createRoom()" class="w-full bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white py-4 rounded-xl font-bold text-lg transition shadow-lg mb-8 transform hover:scale-[1.02]">
                 🏁 Crear Nueva Sala
             </button>
-            
-            <div class="relative flex py-5 items-center">
-                <div class="flex-grow border-t border-slate-600"></div>
-                <span class="flex-shrink-0 mx-4 text-slate-500 text-sm">O únete a una</span>
-                <div class="flex-grow border-t border-slate-600"></div>
-            </div>
-
             <div class="flex gap-2">
                 <input type="number" id="room-code-input" placeholder="0000" class="w-full bg-slate-900 border border-slate-600 rounded-xl px-4 text-center text-2xl font-mono focus:ring-2 focus:ring-red-500 outline-none tracking-widest text-white">
                 <button onclick="joinRoom()" class="bg-slate-700 hover:bg-slate-600 text-white px-6 rounded-xl font-bold transition border border-slate-600">
@@ -335,11 +319,10 @@
 
     <!-- PANTALLA DE JUEGO -->
     <div id="game-screen" class="hidden fade-in max-w-7xl mx-auto flex flex-col gap-4 sm:gap-6 pb-10">
-        
-        <!-- Navbar -->
         <header class="bg-slate-800 rounded-xl p-4 flex flex-col sm:flex-row justify-between items-center gap-4 shadow-lg border border-slate-700">
             <div class="flex items-center gap-3">
-                <div class="w-10 h-10 bg-red-600 rounded-lg flex items-center justify-center font-bold italic">F1</div>
+                <!-- Recuperado el logo rojo de texto CSS que combina con el estilo -->
+                <div class="w-10 h-10 bg-red-600 rounded-lg flex items-center justify-center font-bold italic shadow-lg text-white text-lg">F1</div>
                 <div>
                     <h1 class="text-lg font-bold leading-tight">Guess Who?</h1>
                     <div id="opponent-status" class="text-xs font-mono text-slate-400">Estado: --</div>
@@ -351,33 +334,22 @@
         </header>
 
         <div class="flex flex-col lg:flex-row gap-6 items-start">
-            
-            <!-- Tablero -->
             <section class="w-full lg:w-3/4 order-2 lg:order-1">
-                <!-- GRID CORREGIDO: 2 columnas en móvil, 3 en tablet, MÁXIMO 4 en PC -->
-                <div id="game-board" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4">
-                    <!-- Cartas generadas por JS -->
-                </div>
+                <div id="game-board" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4"></div>
             </section>
-
-            <!-- Panel Lateral -->
             <aside class="w-full lg:w-1/4 order-1 lg:order-2">
                 <div class="bg-slate-800 p-5 rounded-xl shadow-xl sticky top-4 border border-slate-700">
                     <h2 class="text-xl font-bold text-white mb-1">Mi Piloto</h2>
                     <p class="text-sm text-slate-400 mb-4">Tu identidad secreta</p>
-                    
                     <select id="character-select" class="w-full bg-slate-900 border border-slate-600 text-white rounded-lg p-3 mb-4 focus:border-red-500 outline-none cursor-pointer">
                         <option value="">-- Elige quién eres --</option>
                     </select>
-                    
                     <button id="lock-button" class="hidden w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 px-4 rounded-lg mb-4 shadow-lg transition-all">
                         🔒 Confirmar Selección
                     </button>
-                    
                     <div id="confirmed-msg" class="hidden bg-green-900/30 border border-green-500/50 text-green-400 p-2 rounded-lg text-center text-sm font-bold mb-4">
                         ✓ Selección Guardada
                     </div>
-                    
                     <div class="bg-slate-900 rounded-xl overflow-hidden border-2 border-slate-700 aspect-[1/1] shadow-inner relative">
                         <img id="mystery-card-image" src="https://placehold.co/300x300/1f2937/9CA3AF?text=?" class="w-full h-full object-cover">
                     </div>
@@ -386,19 +358,25 @@
         </div>
     </div>
 
-    <!-- MODAL FIN DE JUEGO / MENSAJES -->
+    <!-- MODAL FINAL (CON FOTO DEL PILOTO) -->
     <div id="game-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div class="absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity"></div>
-        <div class="relative bg-slate-800 rounded-2xl shadow-2xl border border-slate-600 w-full max-w-md p-8 text-center transform scale-100">
-            <h3 id="modal-title" class="text-3xl font-bold text-white mb-4">Título</h3>
-            <p id="modal-message" class="text-slate-300 text-lg mb-8 leading-relaxed">Mensaje...</p>
+        <div class="absolute inset-0 bg-black/90 backdrop-blur-sm transition-opacity"></div>
+        <div class="relative bg-slate-800 rounded-2xl shadow-2xl border-2 border-slate-600 w-full max-w-md p-6 text-center transform scale-100 overflow-hidden">
             
+            <h3 id="modal-title" class="text-3xl font-bold text-white mb-2">Título</h3>
+            <p id="modal-message" class="text-slate-300 text-lg mb-4">Mensaje...</p>
+            
+            <!-- CONTENEDOR DE LA IMAGEN GRACIOSA/PILOTO -->
+            <div id="modal-image-container" class="hidden mb-6 flex justify-center">
+                <div class="relative w-48 h-48 rounded-full overflow-hidden border-4 border-white shadow-lg animate-bounce-slow">
+                    <img id="modal-pilot-image" src="" class="w-full h-full object-cover">
+                </div>
+            </div>
+
             <div class="flex flex-col gap-3">
-                <!-- Botón Reiniciar (Solo visible al final) -->
                 <button id="modal-restart-btn" onclick="triggerRestart()" class="hidden w-full bg-red-600 hover:bg-red-500 text-white font-bold py-3 rounded-xl shadow-lg transition transform hover:scale-105">
                     🔄 Jugar otra vez
                 </button>
-                
                 <button onclick="document.getElementById('game-modal').classList.add('hidden')" class="w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-3 rounded-xl transition">
                     Cerrar
                 </button>
@@ -407,7 +385,6 @@
     </div>
 
     <script>
-        // DATOS DE LOS PILOTOS
         const characters = [
             { name: "Oscar Piastri", imageUrl: "imagenes/Piastri.png" }, { name: "Lando Norris", imageUrl: "imagenes/Norris.png" },
             { name: "Charles Leclerc", imageUrl: "imagenes/Leclerc.png" }, { name: "Lewis Hamilton", imageUrl: "imagenes/Hamilton.png" },
@@ -421,16 +398,18 @@
             { name: "Pierre Gasly", imageUrl: "imagenes/Gasly.png" }, { name: "Franco Colapinto", imageUrl: "imagenes/Colapinto.png" }
         ];
 
+        window.charactersData = characters;
+
         document.addEventListener('DOMContentLoaded', () => {
             const gameBoard = document.getElementById('game-board');
             const select = document.getElementById('character-select');
             const lockBtn = document.getElementById('lock-button');
-            const mysteryImg = document.getElementById('mystery-card-image');
             const guessBtn = document.getElementById('guess-button');
-            // CORREGIDO: Actualizado a "f1 logo.png" para que coincida con tu archivo
-            const f1Logo = "imagenes/f1 logo.png"; 
+            const mysteryImg = document.getElementById('mystery-card-image');
+            
+            // Carta trasera sigue usando el archivo grande de cuadros
+            const cardBackLogo = "imagenes/logo-f1.png"; 
 
-            // Llenar Select
             characters.forEach(c => {
                 const opt = document.createElement('option');
                 opt.value = c.name;
@@ -438,11 +417,10 @@
                 select.appendChild(opt);
             });
 
-            // Generar Cartas (SIN TEXTO ABAJO)
             characters.forEach(char => {
                 const card = document.createElement('div');
                 card.className = 'character-card group';
-                card.setAttribute('data-name', char.name); // Guardamos el nombre en un atributo data
+                card.setAttribute('data-name', char.name);
                 
                 card.innerHTML = `
                     <div class="card-inner">
@@ -450,17 +428,14 @@
                             <img src="${char.imageUrl}" class="w-full h-full object-cover" alt="${char.name}" onerror="this.src='https://placehold.co/300x400?text=IMG+Error'">
                         </div>
                         <div class="card-back">
-                            <!-- CORREGIDO: Logo más grande, centrado y con espacio para no tocar bordes -->
-                            <img src="${f1Logo}" class="w-full h-full object-contain p-2 opacity-90" onerror="this.style.display='none'">
+                            <img src="${cardBackLogo}" class="w-full h-full object-contain p-2 opacity-90" onerror="this.style.display='none'">
                         </div>
                     </div>
                 `;
-                // Efecto de sonido al voltear (opcional, visual por ahora)
                 card.addEventListener('click', () => card.classList.toggle('is-flipped'));
                 gameBoard.appendChild(card);
             });
 
-            // Selección de personaje
             select.addEventListener('change', (e) => {
                 const val = e.target.value;
                 if(!val) {
@@ -473,15 +448,14 @@
                 lockBtn.classList.remove('hidden');
             });
 
-            // Confirmar
             lockBtn.addEventListener('click', () => {
+                if(!select.value) return; 
                 select.disabled = true;
                 lockBtn.classList.add('hidden');
                 document.getElementById('confirmed-msg').classList.remove('hidden');
                 if(window.confirmCharacterSelection) window.confirmCharacterSelection(select.value);
             });
 
-            // Adivinar
             guessBtn.addEventListener('click', () => {
                 if(window.attemptGuess) window.attemptGuess();
             });
