@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>A Quién Elijo? - Edición F1</title>
     
-    <!-- ÍCONO DE LA PESTAÑA (Favicon): Solo aquí usamos 'f1 logo.png' para el navegador -->
+    <!-- ÍCONO DE LA PESTAÑA -->
     <link rel="icon" type="image/png" href="imagenes/f1 logo.png">
 
     <!-- Tailwind CSS -->
@@ -20,9 +20,6 @@
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // ==========================================
-        // CONFIGURACIÓN DE FIREBASE
-        // ==========================================
         const firebaseConfig = {
             apiKey: "AIzaSyC5J_1zcuh8HpM7vgnVT49ktcpAxQ-GFIY",
             authDomain: "f1-a-quien-elijo.firebaseapp.com",
@@ -182,14 +179,18 @@
             const modalMsg = document.getElementById('modal-message');
             const restartBtn = document.getElementById('modal-restart-btn');
             
-            // Imagen del piloto secreto
+            // LÓGICA MEMES: Busca si hay un meme, si no, usa la foto normal
             const secretPilot = window.charactersData.find(c => c.name === opponentSecret);
-            const secretImgUrl = secretPilot ? secretPilot.imageUrl : '';
+            let resultImgUrl = '';
+            
+            if (secretPilot) {
+                resultImgUrl = (secretPilot.memeUrl && secretPilot.memeUrl !== "") ? secretPilot.memeUrl : secretPilot.imageUrl;
+            }
 
             // Mostrar imagen
             const imgContainer = document.getElementById('modal-image-container');
             const modalImg = document.getElementById('modal-pilot-image');
-            modalImg.src = secretImgUrl;
+            modalImg.src = resultImgUrl;
             imgContainer.classList.remove('hidden');
 
             if (guessedName === opponentSecret) {
@@ -289,10 +290,9 @@
         </div>
     </div>
 
-    <!-- PANTALLA DE LOBBY: Título original de texto recuperado -->
+    <!-- PANTALLA DE LOBBY -->
     <div id="lobby-screen" class="hidden max-w-md mx-auto mt-10 sm:mt-20 text-center fade-in px-4">
-        <!-- Eliminé la imagen grande de aquí para volver al texto -->
-        <h1 class="text-6xl font-black text-white italic mb-2 tracking-tighter transform -skew-x-6">
+        <h1 class="text-5xl font-black text-white italic mb-2 tracking-tighter">
             F1 <span class="text-red-600">GUESS WHO?</span>
         </h1>
         <p class="text-slate-400 mb-8 font-medium">Edición Pilotos 2025</p>
@@ -321,7 +321,6 @@
     <div id="game-screen" class="hidden fade-in max-w-7xl mx-auto flex flex-col gap-4 sm:gap-6 pb-10">
         <header class="bg-slate-800 rounded-xl p-4 flex flex-col sm:flex-row justify-between items-center gap-4 shadow-lg border border-slate-700">
             <div class="flex items-center gap-3">
-                <!-- Recuperado el logo rojo de texto CSS que combina con el estilo -->
                 <div class="w-10 h-10 bg-red-600 rounded-lg flex items-center justify-center font-bold italic shadow-lg text-white text-lg">F1</div>
                 <div>
                     <h1 class="text-lg font-bold leading-tight">Guess Who?</h1>
@@ -358,7 +357,7 @@
         </div>
     </div>
 
-    <!-- MODAL FINAL (CON FOTO DEL PILOTO) -->
+    <!-- MODAL FINAL (CON FOTO/MEME DEL PILOTO) -->
     <div id="game-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
         <div class="absolute inset-0 bg-black/90 backdrop-blur-sm transition-opacity"></div>
         <div class="relative bg-slate-800 rounded-2xl shadow-2xl border-2 border-slate-600 w-full max-w-md p-6 text-center transform scale-100 overflow-hidden">
@@ -366,9 +365,10 @@
             <h3 id="modal-title" class="text-3xl font-bold text-white mb-2">Título</h3>
             <p id="modal-message" class="text-slate-300 text-lg mb-4">Mensaje...</p>
             
-            <!-- CONTENEDOR DE LA IMAGEN GRACIOSA/PILOTO -->
+            <!-- CONTENEDOR DE LA IMAGEN: Ahora es cuadrado y más grande -->
             <div id="modal-image-container" class="hidden mb-6 flex justify-center">
-                <div class="relative w-48 h-48 rounded-full overflow-hidden border-4 border-white shadow-lg animate-bounce-slow">
+                <!-- Se eliminó 'rounded-full' y se cambió el tamaño a w-64 h-64 -->
+                <div class="relative w-64 h-64 border-4 border-white shadow-lg animate-bounce-slow">
                     <img id="modal-pilot-image" src="" class="w-full h-full object-cover">
                 </div>
             </div>
@@ -386,16 +386,26 @@
 
     <script>
         const characters = [
-            { name: "Oscar Piastri", imageUrl: "imagenes/Piastri.png" }, { name: "Lando Norris", imageUrl: "imagenes/Norris.png" },
-            { name: "Charles Leclerc", imageUrl: "imagenes/Leclerc.png" }, { name: "Lewis Hamilton", imageUrl: "imagenes/Hamilton.png" },
-            { name: "George Russell", imageUrl: "imagenes/Russell.png" }, { name: "Kimi Antonelli", imageUrl: "imagenes/Antonelli.png" },
-            { name: "Max Verstappen", imageUrl: "imagenes/Verstappen.png" }, { name: "Yuki Tsunoda", imageUrl: "imagenes/Tsunoda.png" },
-            { name: "Alexander Albon", imageUrl: "imagenes/Albon.png" }, { name: "Carlos Sainz", imageUrl: "imagenes/Sainz.png" },
-            { name: "Liam Lawson", imageUrl: "imagenes/Lawson.png" }, { name: "Isack Hadjar", imageUrl: "imagenes/Hadjar.png" },
-            { name: "Lance Stroll", imageUrl: "imagenes/Stroll.png" }, { name: "Fernando Alonso", imageUrl: "imagenes/Alonso.png" },
-            { name: "Esteban Ocon", imageUrl: "imagenes/Ocon.png" }, { name: "Oliver Bearman", imageUrl: "imagenes/Bearman.png" },
-            { name: "Nico Hulkenberg", imageUrl: "imagenes/Hulkenberg.png" }, { name: "Gabriel Bortoleto", imageUrl: "imagenes/Bortoleto.png" },
-            { name: "Pierre Gasly", imageUrl: "imagenes/Gasly.png" }, { name: "Franco Colapinto", imageUrl: "imagenes/Colapinto.png" }
+            { name: "Oscar Piastri", imageUrl: "imagenes/Piastri.png", memeUrl: "imagenes/piastri-meme.png" },
+            { name: "Lando Norris", imageUrl: "imagenes/Norris.png", memeUrl: "imagenes/norris-meme.png" },
+            { name: "Charles Leclerc", imageUrl: "imagenes/Leclerc.png", memeUrl: "imagenes/leclerc-meme.png" },
+            { name: "Lewis Hamilton", imageUrl: "imagenes/Hamilton.png", memeUrl: "imagenes/hamilton-meme.png" },
+            { name: "George Russell", imageUrl: "imagenes/Russell.png", memeUrl: "imagenes/russell-meme.png" },
+            { name: "Kimi Antonelli", imageUrl: "imagenes/Antonelli.png", memeUrl: "imagenes/antonelli-meme.png" },
+            { name: "Max Verstappen", imageUrl: "imagenes/Verstappen.png", memeUrl: "imagenes/verstappen-meme.png" },
+            { name: "Yuki Tsunoda", imageUrl: "imagenes/Tsunoda.png", memeUrl: "imagenes/tsunoda-meme.png" },
+            { name: "Alexander Albon", imageUrl: "imagenes/Albon.png", memeUrl: "imagenes/albon-meme.png" },
+            { name: "Carlos Sainz", imageUrl: "imagenes/Sainz.png", memeUrl: "imagenes/sainz-meme.png" },
+            { name: "Liam Lawson", imageUrl: "imagenes/Lawson.png", memeUrl: "imagenes/lawson-meme.png" },
+            { name: "Isack Hadjar", imageUrl: "imagenes/Hadjar.png", memeUrl: "imagenes/hadjar-meme.png" },
+            { name: "Lance Stroll", imageUrl: "imagenes/Stroll.png", memeUrl: "imagenes/stroll-meme.png" },
+            { name: "Fernando Alonso", imageUrl: "imagenes/Alonso.png", memeUrl: "imagenes/alonso-meme.png" },
+            { name: "Esteban Ocon", imageUrl: "imagenes/Ocon.png", memeUrl: "imagenes/ocon-meme.png" },
+            { name: "Oliver Bearman", imageUrl: "imagenes/Bearman.png", memeUrl: "imagenes/bearman-meme.png" },
+            { name: "Nico Hulkenberg", imageUrl: "imagenes/Hulkenberg.png", memeUrl: "imagenes/hulkenberg-meme.png" },
+            { name: "Gabriel Bortoleto", imageUrl: "imagenes/Bortoleto.png", memeUrl: "imagenes/bortoleto-meme.png" },
+            { name: "Pierre Gasly", imageUrl: "imagenes/Gasly.png", memeUrl: "imagenes/gasly-meme.png" },
+            { name: "Franco Colapinto", imageUrl: "imagenes/Colapinto.png", memeUrl: "imagenes/colapinto-meme.png" }
         ];
 
         window.charactersData = characters;
@@ -407,7 +417,6 @@
             const guessBtn = document.getElementById('guess-button');
             const mysteryImg = document.getElementById('mystery-card-image');
             
-            // Carta trasera sigue usando el archivo grande de cuadros
             const cardBackLogo = "imagenes/logo-f1.png"; 
 
             characters.forEach(c => {
