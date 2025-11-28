@@ -3,374 +3,360 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>¿A Quién Elijo? - F1 Edition</title>
+    <title>¿A Quién Elijo? - F1 Edition (Online)</title>
     
-    <!-- Carga de Tailwind CSS --><script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- Carga de la fuente Inter --><link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <!-- Fuentes -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
     
+    <!-- FIREBASE -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-analytics.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // ==========================================
+        // TU CONFIGURACIÓN DE FIREBASE
+        // ==========================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyC5J_1zcuh8HpM7vgnVT49ktcpAxQ-GFIY",
+            authDomain: "f1-a-quien-elijo.firebaseapp.com",
+            projectId: "f1-a-quien-elijo",
+            storageBucket: "f1-a-quien-elijo.firebasestorage.app",
+            messagingSenderId: "636614203962",
+            appId: "1:636614203962:web:e23ff161f46e077b413303",
+            measurementId: "G-68RW750TXQ"
+        };
+
+        // Inicializar Firebase
+        const app = initializeApp(firebaseConfig);
+        const analytics = getAnalytics(app); // Analytics activado
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Variables Globales
+        let userId = null;
+        let currentRoomId = null;
+        let isHost = false;
+        let roomData = null;
+
+        // ==========================================
+        // AUTENTICACIÓN (ANÓNIMA)
+        // ==========================================
+        const initAuth = async () => {
+            try {
+                // Como usas tu propio proyecto, usamos directamente el login anónimo
+                await signInAnonymously(auth);
+            } catch (error) {
+                console.error("Error de autenticación:", error);
+                alert("Error de conexión con Firebase: " + error.message);
+            }
+        };
+        initAuth();
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                userId = user.uid;
+                console.log("Conectado con ID:", userId);
+                document.getElementById('loading-screen').classList.add('hidden');
+                document.getElementById('lobby-screen').classList.remove('hidden');
+            }
+        });
+
+        // ==========================================
+        // LÓGICA DE SALAS
+        // ==========================================
+
+        // Función auxiliar para obtener la referencia a la sala
+        function getRoomRef(roomId) {
+            // Ahora guardamos los datos en una colección simple llamada 'partidas'
+            return doc(db, 'partidas', `sala_${roomId}`);
+        }
+
+        window.createRoom = async () => {
+            if (!userId) return;
+            const roomId = Math.floor(1000 + Math.random() * 9000).toString();
+            currentRoomId = roomId;
+            isHost = true;
+
+            const roomRef = getRoomRef(roomId);
+            
+            await setDoc(roomRef, {
+                hostId: userId,
+                guestId: null,
+                status: 'waiting', 
+                hostSecret: null,
+                guestSecret: null,
+                createdAt: Date.now()
+            });
+
+            enterLobbyUI(roomId);
+            subscribeToRoom(roomId);
+        };
+
+        window.joinRoom = async () => {
+            if (!userId) return;
+            const inputCode = document.getElementById('room-code-input').value;
+            if (inputCode.length !== 4) return alert("Código inválido (debe ser de 4 dígitos)");
+
+            const roomRef = getRoomRef(inputCode);
+            const roomSnap = await getDoc(roomRef);
+
+            if (roomSnap.exists()) {
+                if (roomSnap.data().status !== 'waiting') {
+                    return alert("Sala llena o en juego.");
+                }
+                
+                currentRoomId = inputCode;
+                isHost = false;
+                
+                await updateDoc(roomRef, {
+                    guestId: userId,
+                    status: 'playing'
+                });
+
+                subscribeToRoom(inputCode);
+            } else {
+                alert("Sala no encontrada");
+            }
+        };
+
+        function subscribeToRoom(roomId) {
+            const roomRef = getRoomRef(roomId);
+            onSnapshot(roomRef, (doc) => {
+                if (!doc.exists()) return;
+                roomData = doc.data();
+                updateGameUI(roomData);
+            });
+        }
+
+        // ==========================================
+        // UI Y JUEGO
+        // ==========================================
+
+        function enterLobbyUI(code) {
+            document.getElementById('lobby-screen').classList.add('hidden');
+            document.getElementById('waiting-screen').classList.remove('hidden');
+            document.getElementById('display-room-code').innerText = code;
+        }
+
+        function updateGameUI(data) {
+            if (data.status === 'playing') {
+                document.getElementById('waiting-screen').classList.add('hidden');
+                document.getElementById('lobby-screen').classList.add('hidden');
+                document.getElementById('game-screen').classList.remove('hidden');
+                
+                const opponentStatus = document.getElementById('opponent-status');
+                const opponentSecret = isHost ? data.guestSecret : data.hostSecret;
+
+                if (opponentSecret) {
+                    opponentStatus.innerHTML = '<span class="text-green-400">● Oponente listo</span>';
+                } else {
+                    opponentStatus.innerHTML = '<span class="text-yellow-400">● Oponente eligiendo...</span>';
+                }
+            }
+        }
+
+        window.confirmCharacterSelection = async (characterName) => {
+            if (!currentRoomId) return;
+            const roomRef = getRoomRef(currentRoomId);
+            if (isHost) {
+                await updateDoc(roomRef, { hostSecret: characterName });
+            } else {
+                await updateDoc(roomRef, { guestSecret: characterName });
+            }
+        }
+
+        window.attemptGuess = () => {
+            if (!roomData) return;
+            const opponentSecret = isHost ? roomData.guestSecret : roomData.hostSecret;
+            const mySecret = isHost ? roomData.hostSecret : roomData.guestSecret;
+
+            if (!mySecret) return alert("¡Elige tu piloto primero!");
+            if (!opponentSecret) return alert("El oponente aún no elige.");
+
+            const faceUpCards = document.querySelectorAll('.character-card:not(.is-flipped)');
+            if (faceUpCards.length !== 1) {
+                window.showModalInternal("¡Regla!", "Debes descartar hasta que quede <strong>SOLO UNO</strong>.");
+                return;
+            }
+
+            const guessedName = faceUpCards[0].getAttribute('aria-label').replace('Carta de ', '');
+
+            if (guessedName === opponentSecret) {
+                window.showModalInternal("¡VICTORIA! 🏆", `¡Acertaste! Era <strong>${opponentSecret}</strong>.`);
+            } else {
+                window.showModalInternal("DERROTA ❌", `Fallaste. Te quedó <strong>${guessedName}</strong>, pero era <strong>${opponentSecret}</strong>.`);
+            }
+        };
+    </script>
+
     <style>
-        /* ... (Estilos CSS sin cambios) ... */
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #111827; /* bg-gray-900 */
-        }
-        .character-card {
-            perspective: 1000px;
-            cursor: pointer;
-        }
-        .card-inner {
-            position: relative;
-            width: 100%;
-            aspect-ratio: 1 / 1; 
-            transition: transform 0.6s;
-            transform-style: preserve-3d;
-        }
-        .character-card.is-flipped .card-inner {
-            transform: rotateY(180deg);
-        }
-        .card-front,
-        .card-back {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            -webkit-backface-visibility: hidden;
-            backface-visibility: hidden;
-            border-radius: 0.5rem;
-            overflow: hidden;
-        }
-        .card-back {
-            transform: rotateY(180deg);
-        }
-        #mystery-card-container {
-            aspect-ratio: 1 / 1;
-        }
-        /* Estilo para el dropdown deshabilitado */
-        select:disabled {
-            background-color: #4B5563; /* bg-gray-600 */
-            opacity: 0.7;
-            cursor: not-allowed;
-        }
-        
-        /* --- NUEVO ESTILO PARA EL MODAL --- */
-        /* Fondo oscuro del modal */
-        #game-modal-overlay {
-            transition: opacity 0.3s ease;
-        }
-        /* Contenedor del modal */
-        #game-modal-content {
-            transition: all 0.3s ease;
-            transform: translateY(-20px);
-        }
-        #game-modal.hidden #game-modal-content {
-            transform: translateY(0px);
-        }
-        
+        body { font-family: 'Inter', sans-serif; background-color: #111827; }
+        .character-card { perspective: 1000px; cursor: pointer; }
+        .card-inner { position: relative; width: 100%; aspect-ratio: 1 / 1; transition: transform 0.6s; transform-style: preserve-3d; }
+        .character-card.is-flipped .card-inner { transform: rotateY(180deg); }
+        .card-front, .card-back { position: absolute; width: 100%; height: 100%; -webkit-backface-visibility: hidden; backface-visibility: hidden; border-radius: 0.5rem; overflow: hidden; }
+        .card-back { transform: rotateY(180deg); }
+        .fade-in { animation: fadeIn 0.5s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
     </style>
 </head>
-<body class="bg-gray-900 text-white min-h-screen p-4 sm:p-8">
+<body class="bg-gray-900 text-white min-h-screen p-4">
 
-    <header class="max-w-7xl mx-auto mb-6">
-        <div class="flex flex-col sm:flex-row justify-between items-center gap-4">
-            <h1 class="text-3xl sm:text-4xl font-bold text-center text-blue-300">
-                ¿A Quién Elijo? - F1 Edition
-            </h1>
-            
-            <div class="flex gap-2">
-                <!-- NUEVO BOTÓN DE ADIVINAR --><button id="guess-button" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-6 rounded-lg shadow-md transition-colors duration-300">
-                    Adivinar Piloto
-                </button>
-                
-                <!-- Botón de Reinicio --><button id="reset-button" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg shadow-md transition-colors duration-300">
-                    Reiniciar Juego
-                </button>
-            </div>
-        </div>
-    </header>
-
-    <main class="max-w-7xl mx-auto flex flex-col md:flex-row gap-6">
-        
-        <!-- Sección del Tablero de Juego --><section class="w-full md:w-3/4">
-            
-            <!-- Cuadrícula del tablero (4 columnas en escritorio, 2 en móvil) --><div id="game-board" class="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-5">
-                <!-- Las cartas se generarán aquí por JavaScript --></div>
-        </section>
-
-        <!-- Panel Lateral para el Personaje Secreto --><aside class="w-full md:w-1/4">
-            <div class="bg-gray-800 p-4 rounded-lg shadow-lg sticky top-8">
-                <h2 class="text-2xl font-bold text-blue-300 mb-4">Mi Piloto</h2>
-                <div class="space-y-4">
-                    <label for="character-select" class="block text-sm font-medium text-gray-300">Elige tu piloto secreto:</label>
-                    
-                    <!-- Menú desplegable de selección --><select id="character-select" class="w-full bg-gray-700 border border-gray-600 text-white rounded-lg p-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-300">
-                        <option value="">-- Elige un piloto --</option>
-                        <!-- Las opciones se generarán aquí por JavaScript --></select>
-                    
-                    <!-- BOTÓN DE CONFIRMAR --><button id="lock-button" class="hidden w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-all duration-300">
-                        Confirmar Piloto
-                    </button>
-                    
-                    <!-- Contenedor de la imagen secreta --><div id="mystery-card-container" class="bg-gray-700 rounded-lg flex items-center justify-center overflow-hidden border-4 border-gray-600">
-                        <!-- Placeholder 1:1 --><img id="mystery-card-image" src="https://placehold.co/300x300/4B5563/9CA3AF?text=?" alt="Piloto misterioso" class="w-full h-full object-cover transition-opacity duration-300">
-                    </div>
-                </div>
-            </div>
-        </aside>
-
-    </main>
-
-    <!-- --- NUEVO MODAL DE VICTORIA/DERROTA --- -->
-    <div id="game-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
-        <!-- Fondo oscuro -->
-        <div id="game-modal-overlay" class="absolute inset-0 bg-black bg-opacity-75"></div>
-        
-        <!-- Contenido del modal -->
-        <div id="game-modal-content" class="relative bg-gray-800 rounded-lg shadow-xl w-full max-w-md p-6">
-            <!-- Texto del mensaje (se llenará con JS) -->
-            <p id="game-modal-text" class="text-white text-lg text-center mb-6">
-                Este es un mensaje de prueba.
-            </p>
-            
-            <!-- Botón de cerrar -->
-            <button id="game-modal-close" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg">
-                Entendido
-            </button>
+    <!-- PANTALLA DE CARGA -->
+    <div id="loading-screen" class="fixed inset-0 bg-gray-900 flex items-center justify-center z-50">
+        <div class="text-center">
+            <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto mb-4"></div>
+            <p>Conectando...</p>
         </div>
     </div>
 
+    <!-- PANTALLA DE LOBBY -->
+    <div id="lobby-screen" class="hidden max-w-md mx-auto mt-20 text-center fade-in">
+        <h1 class="text-4xl font-bold text-blue-400 mb-8">F1 Guess Who?</h1>
+        <div class="bg-gray-800 p-8 rounded-xl shadow-lg border border-gray-700">
+            <div class="mb-8 pb-8 border-b border-gray-700">
+                <button onclick="createRoom()" class="w-full bg-blue-600 hover:bg-blue-500 text-white py-3 rounded-lg font-bold transition">Crear Sala</button>
+            </div>
+            <div>
+                <div class="flex gap-2">
+                    <input type="number" id="room-code-input" placeholder="Código" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 text-center text-xl">
+                    <button onclick="joinRoom()" class="bg-green-600 hover:bg-green-500 text-white px-6 rounded-lg font-bold transition">Entrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PANTALLA DE ESPERA -->
+    <div id="waiting-screen" class="hidden fixed inset-0 bg-gray-900 flex flex-col items-center justify-center z-40 fade-in">
+        <h2 class="text-2xl text-gray-400 mb-4">Código de sala:</h2>
+        <div id="display-room-code" class="text-6xl font-bold text-white tracking-widest mb-8 bg-gray-800 px-8 py-4 rounded-xl border border-blue-500">----</div>
+        <p class="text-lg animate-pulse text-blue-300">Esperando jugador 2...</p>
+    </div>
+
+    <!-- PANTALLA DE JUEGO -->
+    <div id="game-screen" class="hidden fade-in max-w-7xl mx-auto flex flex-col gap-6">
+        <header class="flex flex-col sm:flex-row justify-between items-center gap-4 mb-2">
+            <div>
+                <h1 class="text-2xl font-bold text-blue-300">En Partida</h1>
+                <div id="opponent-status" class="text-sm font-mono mt-1">...</div>
+            </div>
+            <button id="guess-button" class="bg-yellow-500 hover:bg-yellow-600 text-white font-bold py-2 px-6 rounded-lg shadow-md">¡Adivinar!</button>
+        </header>
+
+        <div class="flex flex-col md:flex-row gap-6">
+            <section class="w-full md:w-3/4 order-2 md:order-1">
+                <div id="game-board" class="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-5 gap-3"></div>
+            </section>
+            <aside class="w-full md:w-1/4 order-1 md:order-2">
+                <div class="bg-gray-800 p-4 rounded-lg shadow-lg sticky top-4 border border-gray-700">
+                    <h2 class="text-xl font-bold text-white mb-2">Mi Piloto</h2>
+                    <select id="character-select" class="w-full bg-gray-700 border border-gray-600 text-white rounded-lg p-2 mb-4">
+                        <option value="">-- Seleccionar --</option>
+                    </select>
+                    <button id="lock-button" class="hidden w-full bg-green-600 hover:bg-green-500 text-white font-bold py-2 px-4 rounded-lg mb-4">Confirmar</button>
+                    <div class="bg-gray-700 rounded-lg overflow-hidden border-2 border-gray-600 aspect-square">
+                        <img id="mystery-card-image" src="https://placehold.co/300x300/374151/9CA3AF?text=?" class="w-full h-full object-cover">
+                    </div>
+                </div>
+            </aside>
+        </div>
+    </div>
+
+    <!-- MODAL -->
+    <div id="game-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div class="absolute inset-0 bg-black bg-opacity-80 backdrop-blur-sm" onclick="document.getElementById('game-modal').classList.add('hidden')"></div>
+        <div class="relative bg-gray-800 rounded-xl shadow-2xl border border-gray-700 w-full max-w-md p-6">
+            <h3 id="modal-title" class="text-2xl font-bold text-white mb-2"></h3>
+            <p id="modal-message" class="text-gray-300 text-lg mb-6"></p>
+            <button onclick="document.getElementById('game-modal').classList.add('hidden')" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg">Cerrar</button>
+        </div>
+    </div>
 
     <script>
-        // Objeto con los personajes y sus URLs (APUNTANDO A LA CARPETA LOCAL 'imagenes/')
+        // --- IMPORTANTE: RUTAS DE IMÁGENES ---
+        // Asegúrate de subir una carpeta llamada 'imagenes' con los archivos .png a tu GitHub
         const characters = [
-            // Fila 1
-            { name: "Oscar Piastri", imageUrl: "imagenes/Piastri.png" },
-            { name: "Lando Norris", imageUrl: "imagenes/Norris.png" },
-            { name: "Charles Leclerc", imageUrl: "imagenes/Leclerc.png" },
-            { name: "Lewis Hamilton", imageUrl: "imagenes/Hamilton.png" },
-            // Fila 2
-            { name: "George Russell", imageUrl: "imagenes/Russell.png" },
-            { name: "Kimi Antonelli", imageUrl: "imagenes/Antonelli.png" },
-            { name: "Max Verstappen", imageUrl: "imagenes/Verstappen.png" },
-            { name: "Yuki Tsunoda", imageUrl: "imagenes/Tsunoda.png" },
-            // Fila 3
-            { name: "Alexander Albon", imageUrl: "imagenes/Albon.png" },
-            { name: "Carlos Sainz", imageUrl: "imagenes/Sainz.png" },
-            { name: "Liam Lawson", imageUrl: "imagenes/Lawson.png" },
-            { name: "Isack Hadjar", imageUrl: "imagenes/Hadjar.png" },
-            // Fila 4
-            { name: "Lance Stroll", imageUrl: "imagenes/Stroll.png" },
-            { name: "Fernando Alonso", imageUrl: "imagenes/Alonso.png" },
-            { name: "Esteban Ocon", imageUrl: "imagenes/Ocon.png" },
-            { name: "Oliver Bearman", imageUrl: "imagenes/Bearman.png" },
-            // Fila 5
-            { name: "Nico Hulkenberg", imageUrl: "imagenes/Hulkenberg.png" },
-            { name: "Gabriel Bortoleto", imageUrl: "imagenes/Bortoleto.png" },
-            { name: "Pierre Gasly", imageUrl: "imagenes/Gasly.png" },
-            { name: "Franco Colapinto", imageUrl: "imagenes/Colapinto.png" }
+            { name: "Oscar Piastri", imageUrl: "imagenes/Piastri.png" }, { name: "Lando Norris", imageUrl: "imagenes/Norris.png" },
+            { name: "Charles Leclerc", imageUrl: "imagenes/Leclerc.png" }, { name: "Lewis Hamilton", imageUrl: "imagenes/Hamilton.png" },
+            { name: "George Russell", imageUrl: "imagenes/Russell.png" }, { name: "Kimi Antonelli", imageUrl: "imagenes/Antonelli.png" },
+            { name: "Max Verstappen", imageUrl: "imagenes/Verstappen.png" }, { name: "Yuki Tsunoda", imageUrl: "imagenes/Tsunoda.png" },
+            { name: "Alexander Albon", imageUrl: "imagenes/Albon.png" }, { name: "Carlos Sainz", imageUrl: "imagenes/Sainz.png" },
+            { name: "Liam Lawson", imageUrl: "imagenes/Lawson.png" }, { name: "Isack Hadjar", imageUrl: "imagenes/Hadjar.png" },
+            { name: "Lance Stroll", imageUrl: "imagenes/Stroll.png" }, { name: "Fernando Alonso", imageUrl: "imagenes/Alonso.png" },
+            { name: "Esteban Ocon", imageUrl: "imagenes/Ocon.png" }, { name: "Oliver Bearman", imageUrl: "imagenes/Bearman.png" },
+            { name: "Nico Hulkenberg", imageUrl: "imagenes/Hulkenberg.png" }, { name: "Gabriel Bortoleto", imageUrl: "imagenes/Bortoleto.png" },
+            { name: "Pierre Gasly", imageUrl: "imagenes/Gasly.png" }, { name: "Franco Colapinto", imageUrl: "imagenes/Colapinto.png" }
         ];
 
-        // Se ejecuta cuando el contenido del HTML está cargado
         document.addEventListener('DOMContentLoaded', () => {
             const gameBoard = document.getElementById('game-board');
-            const resetButton = document.getElementById('reset-button');
-            const characterSelect = document.getElementById('character-select');
-            const mysteryCardImage = document.getElementById('mystery-card-image');
-            const lockButton = document.getElementById('lock-button');
-            
-            // --- NUEVOS ELEMENTOS ---
-            const guessButton = document.getElementById('guess-button');
-            const gameModal = document.getElementById('game-modal');
-            const modalText = document.getElementById('game-modal-text');
-            const closeModalButton = document.getElementById('game-modal-close');
-            
-            // --- LÍNEA CORREGIDA ---
-            const gameModalOverlay = document.getElementById('game-modal-overlay'); // Se añade la definición
-            
-            // Placeholder 1:1
-            const placeholderImage = "https://placehold.co/300x300/4B5563/9CA3AF?text=Selecciona+un+piloto"; 
-            // URL del logo de F1 (APUNTANDO A LA CARPETA LOCAL 'imagenes/')
-            const f1LogoBack = "imagenes/logo-f1.png"; 
+            const select = document.getElementById('character-select');
+            const lockBtn = document.getElementById('lock-button');
+            const mysteryImg = document.getElementById('mystery-card-image');
+            const guessBtn = document.getElementById('guess-button');
+            const f1Logo = "imagenes/logo-f1.png"; 
 
-            // Función para crear el tablero (sin cambios)
-            function createBoard() {
-                gameBoard.innerHTML = ''; 
-                characters.forEach(character => {
-                    const card = document.createElement('div');
-                    card.className = 'character-card';
-                    card.setAttribute('role', 'button');
-                    // IMPORTANTE: El 'aria-label' se usa para la lógica de victoria
-                    card.setAttribute('aria-label', `Carta de ${character.name}`);
-                    const cardInner = document.createElement('div');
-                    cardInner.className = 'card-inner';
-                    const cardFront = document.createElement('div');
-                    cardFront.className = 'card-front bg-white border-4 border-gray-300 rounded-lg shadow-lg';
-                    const img = document.createElement('img');
-                    img.src = character.imageUrl;
-                    img.alt = `Imagen de ${character.name}`;
-                    img.className = 'w-full h-full object-cover';
-                    cardFront.appendChild(img);
-                    const cardBack = document.createElement('div');
-                    cardBack.className = 'card-back border-4 border-red-900 rounded-lg shadow-lg flex items-center justify-center';
-                    const f1LogoImg = document.createElement('img');
-                    f1LogoImg.src = f1LogoBack;
-                    f1LogoImg.alt = "Logo F1";
-                    f1LogoImg.className = 'w-full h-full object-cover'; 
-                    cardBack.appendChild(f1LogoImg);
-                    cardInner.appendChild(cardFront);
-                    cardInner.appendChild(cardBack);
-                    card.appendChild(cardInner);
-                    card.addEventListener('click', () => {
-                        card.classList.toggle('is-flipped');
-                    });
-                    gameBoard.appendChild(card);
-                });
-            }
+            characters.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.name;
+                opt.textContent = c.name;
+                select.appendChild(opt);
+            });
 
-            // --- FUNCIÓN RESETGAME (ACTUALIZADA) ---
-            function resetGame() {
-                const flippedCards = document.querySelectorAll('.character-card.is-flipped');
-                flippedCards.forEach(card => {
-                    card.classList.remove('is-flipped');
-                });
-
-                characterSelect.value = ""; 
-                mysteryCardImage.src = placeholderImage;
-                mysteryCardImage.alt = "Piloto misterioso";
+            characters.forEach(char => {
+                const card = document.createElement('div');
+                card.className = 'character-card group';
+                card.setAttribute('aria-label', `Carta de ${char.name}`);
                 
-                characterSelect.disabled = false; // Habilita el dropdown
-                lockButton.classList.add('hidden'); // Oculta el botón de confirmar
-                
-                // --- NUEVA LÍNEA ---
-                gameModal.classList.add('hidden'); // Oculta el modal
-            }
+                card.innerHTML = `
+                    <div class="card-inner">
+                        <div class="card-front bg-gray-800 border-2 border-gray-600 rounded-lg overflow-hidden relative">
+                            <img src="${char.imageUrl}" class="w-full h-full object-cover" onerror="this.src='https://placehold.co/200x200?text=F1'">
+                            <div class="absolute bottom-0 w-full bg-black bg-opacity-70 text-white text-xs text-center py-1 truncate px-1">${char.name}</div>
+                        </div>
+                        <div class="card-back bg-red-900 border-2 border-red-700 rounded-lg flex items-center justify-center">
+                            <img src="${f1Logo}" class="w-3/4 opacity-50" onerror="this.style.display='none'">
+                        </div>
+                    </div>
+                `;
+                card.addEventListener('click', () => card.classList.toggle('is-flipped'));
+                gameBoard.appendChild(card);
+            });
 
-            // Función para llenar el menú desplegable (sin cambios)
-            function populateSelect() {
-                characterSelect.innerHTML = '<option value="">-- Elige un piloto --</option>'; 
-                characters.forEach(character => {
-                    const option = document.createElement('option');
-                    option.value = character.name;
-                    option.textContent = character.name;
-                    characterSelect.appendChild(option);
-                });
-            }
-
-            // Función para manejar la selección de personaje (sin cambios)
-            function handleCharacterSelect(event) {
-                const selectedName = event.target.value;
-
-                if (selectedName === "") {
-                    mysteryCardImage.src = placeholderImage;
-                    mysteryCardImage.alt = "Piloto misterioso";
-                    lockButton.classList.add('hidden'); 
+            select.addEventListener('change', (e) => {
+                const val = e.target.value;
+                if(!val) {
+                    lockBtn.classList.add('hidden');
+                    mysteryImg.src = "https://placehold.co/300x300/374151/9CA3AF?text=?";
                     return;
                 }
+                const char = characters.find(c => c.name === val);
+                mysteryImg.src = char.imageUrl;
+                lockBtn.classList.remove('hidden');
+            });
 
-                const selectedCharacter = characters.find(char => char.name === selectedName);
-                
-                if (selectedCharacter) {
-                    mysteryCardImage.src = selectedCharacter.imageUrl;
-                    mysteryCardImage.alt = `Piloto elegido: ${selectedCharacter.name}`;
-                    lockButton.classList.remove('hidden'); 
-                }
-            }
-            
-            // Función para bloquear la elección (sin cambios)
-            function lockChoice() {
-                characterSelect.disabled = true; 
-                lockButton.classList.add('hidden'); 
-            }
-            
-            // --- NUEVA FUNCIÓN ---
-            // Muestra el modal con un texto específico
-            function showModal(text) {
-                modalText.innerHTML = text; // Usamos innerHTML para permitir saltos de línea con <br>
-                gameModal.classList.remove('hidden');
-            }
-            
-            // --- NUEVA FUNCIÓN ---
-            // Lógica para comprobar si se ha ganado
-            function checkWin() {
-                const secretName = characterSelect.value;
-                
-                // 1. Comprobar si se ha confirmado un piloto
-                if (characterSelect.disabled === false || secretName === "") {
-                    showModal("Debes elegir y confirmar tu piloto secreto antes de adivinar.");
-                    return;
-                }
-                
-                // 2. Comprobar cuántas cartas quedan boca arriba
-                const faceUpCards = document.querySelectorAll('.character-card:not(.is-flipped)');
-                
-                if (faceUpCards.length !== 1) {
-                    showModal("¡Aún no! Debes dejar exactamente UN piloto boca arriba para poder adivinar.");
-                    return;
-                }
-                
-                // 3. Hay exactamente 1 carta. Comprobar si es la correcta.
-                const guessName = faceUpCards[0].getAttribute('aria-label').replace('Carta de ', '');
-                
-                if (guessName === secretName) {
-                    showModal(`¡GANASTE! 🥳<br><br>Adivinaste correctamente. El piloto era <strong>${secretName}</strong>.`);
-                } else {
-                    showModal(`¡Oh no! Perdiste.<br><br>Dejaste a <strong>${guessName}</strong>, pero tu piloto secreto era <strong>${secretName}</strong>.`);
-                }
-            }
+            lockBtn.addEventListener('click', () => {
+                select.disabled = true;
+                lockBtn.classList.add('hidden');
+                lockBtn.parentElement.innerHTML += `<div class="text-green-400 font-bold text-center mt-2">¡Selección Confirmada!</div>`;
+                if(window.confirmCharacterSelection) window.confirmCharacterSelection(select.value);
+            });
 
-            // Asignar eventos
-            resetButton.addEventListener('click', resetGame);
-            characterSelect.addEventListener('change', handleCharacterSelect);
-            lockButton.addEventListener('click', lockChoice);
-            
-            // --- NUEVOS EVENTOS ---
-            guessButton.addEventListener('click', checkWin);
-            closeModalButton.addEventListener('click', () => gameModal.classList.add('hidden'));
-            gameModalOverlay.addEventListener('click', () => gameModal.classList.add('hidden'));
+            guessBtn.addEventListener('click', () => {
+                if(window.attemptGuess) window.attemptGuess();
+            });
 
-
-            // Inicializar el juego
-            createBoard();
-            populateSelect(); 
+            window.showModalInternal = (title, msg) => {
+                document.getElementById('modal-title').innerHTML = title;
+                document.getElementById('modal-message').innerHTML = msg;
+                document.getElementById('game-modal').classList.remove('hidden');
+            };
         });
     </script>
-    <!-- 🔥 Firebase + Firestore -->
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-app.js";
-  import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/12.5.0/firebase-firestore.js";
-
-  // Configuración de tu proyecto
-  const firebaseConfig = {
-    apiKey: "AIzaSyAvbzdUY9CokU9Rh-OJkZf7SF3Nxvu5QNk",
-    authDomain: "f1-juego.firebaseapp.com",
-    projectId: "f1-juego",
-    storageBucket: "f1-juego.firebasestorage.app",
-    messagingSenderId: "401612401240",
-    appId: "1:401612401240:web:f1ad0dee715c45fead782d",
-    measurementId: "G-M4Q3GCHKY8"
-  };
-
-  // Inicializa Firebase
-  const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
-  console.log("✅ Firebase y Firestore inicializados correctamente.");
-
-  // 📤 Guarda una prueba al abrir la página
-  async function guardarPrueba() {
-    try {
-      await addDoc(collection(db, "partidas"), {
-        jugador: "Ruso",
-        puntos: 10,
-        fecha: new Date()
-      });
-      console.log("🎯 Datos guardados correctamente en Firestore.");
-    } catch (e) {
-      console.error("❌ Error al guardar:", e);
-    }
-  }
-
-  guardarPrueba();
-</script>
 </body>
 </html>
